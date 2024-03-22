@@ -20,7 +20,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module controller(clk, cs, we, address, data_in, data_out, btns, swtchs, leds, segs, an);
+module controller(clk, cs, we, address, data_in, data_out, btns, swtchs, leds, segs, an
+                  );
     input clk;
     output cs;
     output reg we;
@@ -47,6 +48,7 @@ module controller(clk, cs, we, address, data_in, data_out, btns, swtchs, leds, s
     wire clk100Hz;
     wire [6:0] onesDigit, tensDigit;
     
+    wire empty;
     assign empty = (SPR == 7'h7F) ? 1 : 0;
     assign cs = we;
     assign leds[6:0] = DAR;
@@ -57,7 +59,7 @@ module controller(clk, cs, we, address, data_in, data_out, btns, swtchs, leds, s
     
     seven_seg_clock hz100clk(clk, clk100hz);
     twoBCDSeven sevenSegConverter(DVR, onesDigit, tensDigit);
-    sevenSeg(clk100hz, onesDigit, tensDigit, segs, an);
+    sevenSeg sevenSeg(clk100hz, onesDigit, tensDigit, segs, an);
     
     wire [3:0] ctrl_inputs;
     assign ctrl_inputs = {btns[3], btns[2], left, right};
@@ -66,6 +68,9 @@ module controller(clk, cs, we, address, data_in, data_out, btns, swtchs, leds, s
         is_add <= 0;
         is_sub <= 0;
         op_state <= 0;
+        SPR <= 7'h7F;
+        DAR <= 0;
+        DVR <= 0;
     end
     
     always @(posedge clk) begin
@@ -111,14 +116,12 @@ module controller(clk, cs, we, address, data_in, data_out, btns, swtchs, leds, s
                 address <= SPR;
                 data_out <= swtchs;
                 SPR <= SPR - 1;
-                DAR <= SPR;
+                DAR <= DAR - 1;
                 we <= 1;
             end
             2: begin //pop
-                address <= DAR;
-                DVR <= data_in;
                 SPR <= SPR + 1;
-                DAR <= SPR + 2;
+                DAR <= DAR + 1;
                 we <= 0;
             end
             5: begin //add
@@ -139,26 +142,21 @@ module controller(clk, cs, we, address, data_in, data_out, btns, swtchs, leds, s
             end
             9: begin //top
                 we <= 0;
-                address <= DAR;
+                DAR <= SPR + 1;
+            end
+            10: begin //rst
                 SPR <= 8'h7F;
                 DAR <= 0;
                 DVR <= 0;
             end
-            10: begin //rst
-                we <= 0;
-                address <= DAR;
-                DVR <= data_in;
-                DAR <= SPR + 1;
-            end
             13: begin //inc
-                we <= 0;
                 DAR <= DAR + 1;
-                DVR <= data_in;
-                address <= DAR;
             end
             14: begin //dec
-                we <= 0;
                 DAR <= DAR - 1;
+            end
+            default: begin
+                we <= 0;
                 DVR <= data_in;
                 address <= DAR;
             end
